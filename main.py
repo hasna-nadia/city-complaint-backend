@@ -20,6 +20,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:5174",
         "http://localhost:5175",
+        "https://city-complaint-backend-4nqh.onrender.com",
         "https://gentle-kashata-340b59.netlify.app",
     ],
     allow_credentials=True,
