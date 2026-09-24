@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt
@@ -124,28 +125,41 @@ def signup(
     db: Session = Depends(get_db)
 ):
 
-    existing_user = db.query(Users).filter(
-        Users.email == user.email
-    ).first()
+    try:
+        existing_user = db.query(Users).filter(
+            Users.email == user.email
+        ).first()
 
-    if existing_user:
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail="Email already registered"
+            )
+
+        new_user = Users(
+            name=user.name,
+            email=user.email,
+            password=bcrypt_context.hash(
+                user.password
+            ),
+            role="user"
+        )
+
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    except IntegrityError:
+        db.rollback()
         raise HTTPException(
             status_code=400,
             detail="Email already registered"
         )
-
-    new_user = Users(
-        name=user.name,
-        email=user.email,
-        password=bcrypt_context.hash(
-            user.password
-        ),
-        role="user"
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Signup is temporarily unavailable"
+        )
 
     return {
         "message": "User created successfully"
